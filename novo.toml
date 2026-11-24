@@ -1,0 +1,30 @@
+[package]
+name        = "fpmath-nv"
+version     = "0.1.0"
+description = "Single-precision sine, cosine, arctangent, two-argument arctangent, arcsine, square root and reciprocal square root for a device whose tier refuses libm, written in +, -, *, / and comparisons with no allocation: Cephes' binary32 routines, each with its measured error against the host's maths library and its size on a Cortex-M4."
+license     = "Apache-2.0"
+
+stability   = "experimental"
+
+# `core`: these are arithmetic over numbers the caller already holds.
+# Nothing is read, nothing is written, no clock is consulted, and no
+# function declares an effect.  `tests/embedded_probe.nv` builds the
+# package for a Cortex-M, so the claim that nothing here allocates is a
+# link, not a sentence.
+layer       = "core"
+
+category    = "embedded"
+
+tags        = ["fp32", "single-precision", "trigonometry", "sin", "cos", "atan2", "asin", "sqrt", "libm", "embedded", "no-alloc"]
+repository  = "https://github.com/novolang/fpmath-nv"
+maintainers = ["novo-lang"]
+novo        = ">= 0.26.1"
+
+# A library: no `main`, so `novo pkg build` type-checks and
+# effect-checks every module under `src/` and writes no binary.
+
+[docs.pages]
+"README.md" = "Single-precision maths for a device with no libm"
+
+[dependencies]
+# None.

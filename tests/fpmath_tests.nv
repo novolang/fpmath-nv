@@ -1,0 +1,125 @@
+// fpmath_tests — each function against the host's `math` over a dense sweep
+// of its domain, and what each answers at the edges of the domain.
+//
+// The bound asserted for a function is the bound its comment in
+// `src/fpmath.nv` states.  `tests/accuracy.nv` prints the maxima the sweeps
+// find, which the README gives.
+
+use std.test
+use fpmath
+
+// ── Against the host's libm ──────────────────────────────────────────
+
+@test
+fn test_sine_and_cosine_agree_with_libm_over_a_hundred_radians()
+    var worst_sin = 0.0
+    var worst_cos = 0.0
+    for i in 0..200001
+        let x32 = ((i as Float - 100000.0) * 0.001) as fp32
+        let xf = x32 as Float
+        worst_sin = math.max(worst_sin, math.abs(fpmath.sin(x32) as Float - math.sin(xf)))
+        worst_cos = math.max(worst_cos, math.abs(fpmath.cos(x32) as Float - math.cos(xf)))
+    test.assert(worst_sin < 0.0000002)
+    test.assert(worst_cos < 0.0000002)
+
+@test
+fn test_arctangent_agrees_with_libm_from_a_ten_thousandth_to_ten_thousand()
+    var worst = 0.0
+    for i in 0..60001
+        let x32 = ((i as Float - 30000.0) * 0.0005) as fp32
+        let xf = x32 as Float
+        worst = math.max(worst, math.abs(fpmath.atan(x32) as Float - math.atan(xf)))
+    for k in 0..8001
+        let x32 = math.pow(10.0, (k as Float - 4000.0) / 1000.0) as fp32
+        let xf = x32 as Float
+        worst = math.max(worst, math.abs(fpmath.atan(x32) as Float - math.atan(xf)))
+        worst = math.max(worst, math.abs(fpmath.atan(-x32) as Float - math.atan(-xf)))
+    test.assert(worst < 0.0000003)
+
+@test
+fn test_two_argument_arctangent_agrees_with_libm_on_a_grid_and_on_a_circle()
+    var worst = 0.0
+    for i in 0..201
+        for j in 0..201
+            let y32 = ((i as Float - 100.0) * 0.1) as fp32
+            let x32 = ((j as Float - 100.0) * 0.1) as fp32
+            worst = math.max(worst,
+                math.abs(fpmath.atan2(y32, x32) as Float - math.atan2(y32 as Float, x32 as Float)))
+    for i in 0..100001
+        let ang = (i as Float - 50000.0) * 0.00006283185307179586
+        let y32 = (math.sin(ang) * 3.0) as fp32
+        let x32 = (math.cos(ang) * 3.0) as fp32
+        worst = math.max(worst, math.abs(fpmath.atan2(y32, x32) as Float - math.atan2(y32 as Float, x32 as Float)))
+    test.assert(worst < 0.0000003)
+
+@test
+fn test_arcsine_agrees_with_libm_over_the_whole_interval()
+    var worst = 0.0
+    for i in 0..200001
+        let x32 = ((i as Float - 100000.0) * 0.00001) as fp32
+        let xf = x32 as Float
+        worst = math.max(worst, math.abs(fpmath.asin(x32) as Float - math.asin(xf)))
+    for j in 0..20001
+        let x32 = (1.0 - j as Float * 0.000000006) as fp32
+        let xf = x32 as Float
+        worst = math.max(worst, math.abs(fpmath.asin(x32) as Float - math.asin(xf)))
+        worst = math.max(worst, math.abs(fpmath.asin(-x32) as Float - math.asin(-xf)))
+    test.assert(worst < 0.0000003)
+
+@test
+fn test_the_roots_agree_with_libm_over_ten_decades()
+    var worst_sqrt = 0.0
+    var worst_inv = 0.0
+    for k in 0..100001
+        let x32 = math.pow(10.0, (k as Float - 50000.0) / 10000.0) as fp32
+        let xf = x32 as Float
+        worst_sqrt = math.max(worst_sqrt, math.abs(fpmath.sqrt(x32) as Float - math.sqrt(xf)) / math.sqrt(xf))
+        worst_inv = math.max(worst_inv, math.abs(fpmath.inv_sqrt(x32) as Float * math.sqrt(xf) - 1.0))
+    test.assert(worst_sqrt < 0.0000002)
+    test.assert(worst_inv < 0.0000002)
+
+// ── Where the interval changes, and the edges ────────────────────────
+
+@test
+fn test_each_quarter_turn_lands_on_its_own_branch_of_sine_and_cosine()
+    for n in -8..9
+        let x = n as Float * 1.5707963267948966
+        let x32 = x as fp32
+        test.assert_approx(fpmath.sin(x32) as Float, math.sin(x32 as Float), 0.0000002)
+        test.assert_approx(fpmath.cos(x32) as Float, math.cos(x32 as Float), 0.0000002)
+    test.assert_eq(fpmath.sin(0.0), 0.0)
+    test.assert_eq(fpmath.cos(0.0), 1.0)
+
+@test
+fn test_arctangent_folds_at_both_thresholds_and_keeps_its_sign()
+    // Either side of tan(pi/8) and of tan(3 pi/8), and in the middle.
+    for x in [0.41, 0.42, 2.41, 2.42, 1.0, 100.0]
+        let x32 = x as fp32
+        test.assert_approx(fpmath.atan(x32) as Float, math.atan(x32 as Float), 0.0000003)
+        test.assert_approx(fpmath.atan(-x32) as Float, math.atan(-x32 as Float), 0.0000003)
+    test.assert_eq(fpmath.atan(0.0), 0.0)
+
+@test
+fn test_the_functions_answer_what_the_edges_of_their_domain_demand()
+    test.assert_eq(fpmath.sqrt(0.0), 0.0)
+    test.assert_eq(fpmath.sqrt(-4.0), 0.0)
+    test.assert_eq(fpmath.inv_sqrt(0.0), 0.0)
+    test.assert_eq(fpmath.inv_sqrt(-1.0), 0.0)
+    test.assert_eq(fpmath.atan2(0.0, 0.0), 0.0)
+    test.assert_approx(fpmath.atan2(1.0, 0.0) as Float, 1.5707963, 0.000001)
+    test.assert_approx(fpmath.atan2(-1.0, 0.0) as Float, -1.5707963, 0.000001)
+    test.assert_approx(fpmath.atan2(0.0, -1.0) as Float, 3.1415927, 0.000001)
+    test.assert_approx(fpmath.atan2(-0.0001, -1.0) as Float, -3.1414926, 0.000001)
+    test.assert_approx(fpmath.asin(1.0) as Float, 1.5707963, 0.0000003)
+    test.assert_approx(fpmath.asin(-1.0) as Float, -1.5707963, 0.0000003)
+    test.assert_approx(fpmath.asin(2.0) as Float, 1.5707963, 0.0000003)
+    test.assert_approx(fpmath.asin(-2.0) as Float, -1.5707963, 0.0000003)
+    test.assert_eq(fpmath.asin(0.0), 0.0)
+    test.assert_approx(fpmath.atan(100.0) as Float, 1.5607966, 0.000001)
+    test.assert_approx(fpmath.atan(-100.0) as Float, -1.5607966, 0.000001)
+
+@test
+fn test_the_roots_of_exact_squares_are_exact_to_the_last_place()
+    test.assert_approx(fpmath.sqrt(4.0) as Float, 2.0, 0.0000005)
+    test.assert_approx(fpmath.sqrt(2.25) as Float, 1.5, 0.0000005)
+    test.assert_approx(fpmath.inv_sqrt(4.0) as Float, 0.5, 0.0000002)

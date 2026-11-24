@@ -1,0 +1,98 @@
+use fpmath
+
+// The unit in the last place of a binary32 whose value is `v`.
+fn ulp(v: Float) -> Float
+    let a = math.abs(v)
+    if a < 1.1754944e-38
+        return 1.401298464324817e-45
+    math.pow(2.0, math.floor(math.log2(a)) - 23.0)
+
+struct Worst
+    abs: Float
+    ulp: Float
+    at: Float
+
+fn upd(w: Worst, err: Float, tru: Float, at: Float) -> Worst
+    let u = err / ulp(tru)
+    Worst { abs: math.max(w.abs, err),
+        ulp: math.max(w.ulp, u),
+        at: (if err > w.abs then at else w.at) }
+
+fn show(name: Str, w: Worst, n: Int)
+    println("${name}: ${n} points, max abs ${w.abs}, max ${w.ulp} ulp, at ${w.at}")
+
+fn main() [io]
+    var s = Worst { abs: 0.0, ulp: 0.0, at: 0.0 }
+    var c = Worst { abs: 0.0, ulp: 0.0, at: 0.0 }
+    for i in 0..200001
+        let x = (i as Float - 100000.0) * 0.001
+        let x32 = x as fp32
+        let xf = x32 as Float
+        let e = math.abs(fpmath.sin(x32) as Float - math.sin(xf))
+        s = upd(s, e, math.sin(xf), xf)
+        let e2 = math.abs(fpmath.cos(x32) as Float - math.cos(xf))
+        c = upd(c, e2, math.cos(xf), xf)
+    show("sin |x|<=100", s, 200001)
+    show("cos |x|<=100", c, 200001)
+    var a = Worst { abs: 0.0, ulp: 0.0, at: 0.0 }
+    for i in 0..60001
+        let x = (i as Float - 30000.0) * 0.0005
+        let x32 = x as fp32
+        let xf = x32 as Float
+        a = upd(a, math.abs(fpmath.atan(x32) as Float - math.atan(xf)), math.atan(xf), xf)
+    for k in 0..8001
+        let x = math.pow(10.0, (k as Float - 4000.0) / 1000.0)
+        let x32 = x as fp32
+        let xf = x32 as Float
+        a = upd(a, math.abs(fpmath.atan(x32) as Float - math.atan(xf)), math.atan(xf), xf)
+        a = upd(a, math.abs(fpmath.atan(-x32) as Float - math.atan(-xf)), math.atan(-xf), -xf)
+    show("atan |x| in 1e-4..1e4 and -15..15", a, 76003)
+    var t = Worst { abs: 0.0, ulp: 0.0, at: 0.0 }
+    var n2 = 0
+    for i in 0..201
+        for j in 0..201
+            let y = (i as Float - 100.0) * 0.1
+            let x = (j as Float - 100.0) * 0.1
+            let y32 = y as fp32
+            let x32 = x as fp32
+            let yf = y32 as Float
+            let xf = x32 as Float
+            let tru = math.atan2(yf, xf)
+            t = upd(t, math.abs(fpmath.atan2(y32, x32) as Float - tru), tru, yf)
+            n2 = n2 + 1
+    for i in 0..100001
+        let ang = (i as Float - 50000.0) * 0.00006283185307179586
+        let y32 = (math.sin(ang) * 3.0) as fp32
+        let x32 = (math.cos(ang) * 3.0) as fp32
+        let tru = math.atan2(y32 as Float, x32 as Float)
+        t = upd(t, math.abs(fpmath.atan2(y32, x32) as Float - tru), tru, ang)
+        n2 = n2 + 1
+    show("atan2 grid -10..10 and a circle", t, n2)
+    var m = Worst { abs: 0.0, ulp: 0.0, at: 0.0 }
+    var ends = Worst { abs: 0.0, ulp: 0.0, at: 0.0 }
+    for i in 0..200001
+        let x = (i as Float - 100000.0) * 0.00001
+        let x32 = x as fp32
+        let xf = x32 as Float
+        let e = math.abs(fpmath.asin(x32) as Float - math.asin(xf))
+        if math.abs(xf) <= 0.99
+            m = upd(m, e, math.asin(xf), xf)
+        else
+            ends = upd(ends, e, math.asin(xf), xf)
+    show("asin |x|<=0.99", m, 198001)
+    show("asin 0.99<|x|<=1", ends, 2000)
+    var r = 0.0
+    var ri = 0.0
+    var at = 0.0
+    for k in 0..100001
+        let x = math.pow(10.0, (k as Float - 50000.0) / 10000.0)
+        let x32 = x as fp32
+        let xf = x32 as Float
+        let rel = math.abs(fpmath.sqrt(x32) as Float - math.sqrt(xf)) / math.sqrt(xf)
+        if rel > r
+            r = rel
+            at = xf
+        let relinv = math.abs(fpmath.inv_sqrt(x32) as Float * math.sqrt(xf) - 1.0)
+        ri = math.max(ri, relinv)
+    println("sqrt 1e-5..1e5: 100001 points, max relative ${r} at ${at}")
+    println("inv_sqrt 1e-5..1e5: max relative ${ri}")

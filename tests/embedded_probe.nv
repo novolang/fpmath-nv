@@ -1,0 +1,59 @@
+// embedded_probe.nv — this package's device claim, as a program that
+// either builds for a Cortex-M or does not.
+//
+// It is not a test.  `scripts/shard_audit.sh`'s `core-embedded` row
+// copies it and the modules it names into a package of its own and
+// runs
+//
+//   novo build --target=nrf52-qemu src/probe.nv
+//
+// which produces a real Cortex-M4 ELF or fails.  `--target=nrf52-qemu`
+// stamps `@tier(embedded)` on every function it compiles, so the build
+// refuses an allocation, a list literal, an unbounded `while` and a
+// libm call wherever one is.
+//
+// WHAT THE CLAIM COVERS: every function of the package.  The probe calls
+// each at a point whose answer is known and folds the checks into one
+// number, so a single comparison decides the run.
+
+use fpmath
+
+@tier(embedded)
+fn near(a: fp32, b: fp32, tol: fp32) -> Bool
+    let d = a - b
+    d <= tol and d >= -tol
+
+@tier(embedded)
+fn score() -> Int
+    var n = 0
+    let tol: fp32 = 0.00001
+    if near(fpmath.sin(1.5707964), 1.0, tol)
+        n = n + 1
+    if near(fpmath.cos(3.1415927), -1.0, tol)
+        n = n + 1
+    if near(fpmath.sin(-0.5) * fpmath.sin(-0.5) + fpmath.cos(-0.5) * fpmath.cos(-0.5), 1.0, tol)
+        n = n + 1
+    if near(fpmath.atan(1.0), 0.7853982, tol)
+        n = n + 1
+    if near(fpmath.atan2(1.0, -1.0), 2.3561945, tol)
+        n = n + 1
+    if near(fpmath.asin(0.5), 0.5235988, tol)
+        n = n + 1
+    if near(fpmath.sqrt(2.0), 1.4142135, tol)
+        n = n + 1
+    if near(fpmath.inv_sqrt(4.0), 0.5, tol)
+        n = n + 1
+    n
+
+@tier(rt)
+fn main() [hw, time]
+    bsp.board.init()
+    // 8 is the number of checks `score` makes.  A mismatch prints FAIL,
+    // and the device's count is what a bisect starts from.
+    let n = score()
+    if n == 8
+        hal.uart.write("PASS: fpmath-embedded\n")
+    else
+        hal.uart.write("FAIL: fpmath-embedded\n")
+    loop
+        core.rt.sleep_ms(1000)
